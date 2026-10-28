@@ -20,6 +20,9 @@
   --r-soft:14px;      /* the corner that closes a group */
   --ease-soft:cubic-bezier(.22,.8,.3,1);
   --ease-pop:cubic-bezier(.34,1.56,.64,1);
+  --enter-dur:340ms;     /* entrance of one message */
+  --enter-stagger:65ms;  /* gap between consecutive messages on first load */
+  --enter-rise:6px;      /* how far a message rises into place */
 }
 .sr-only,.message.joins-prev .msg-head{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .msg-content,.reactions{position:relative}
@@ -35,11 +38,13 @@
 .message.joins-next .reactions{margin-bottom:5px}
 .message.joins-prev>.avatar{visibility:hidden}  /* keeps the column aligned; name and time stay available to screen readers */
 
-/* 3. Gentle transitions */
-.message{transition:margin-bottom .28s var(--ease-soft);transform-origin:0 100%;animation:msg-in .42s var(--ease-soft) backwards;animation-delay:calc(var(--i,0) * 70ms)}
-.message.mine{transform-origin:100% 100%}
-.message:nth-child(3){--i:1}.message:nth-child(4){--i:2}.message:nth-child(5){--i:3}.message:nth-child(6){--i:4}.message:nth-child(7){--i:5}
-@keyframes msg-in{from{opacity:0;transform:translateY(8px) scale(.985)}}
+/* 3. Entrance and gentle transitions
+      Each message row (and the typing indicator after them) fades in while rising a few pixels, one after another.
+      Only opacity and transform animate, so layout, scroll extent and each row's final position are never affected,
+      and the chat container itself is not animated. --i is a row's place in the sequence; the script sets it once on
+      first load. Rows added later have no --i, so they enter once, immediately, and nothing replays. */
+.message,.typing{animation:msg-in var(--enter-dur) var(--ease-soft) backwards;animation-delay:calc(var(--i,0) * var(--enter-stagger))}
+@keyframes msg-in{from{opacity:0;transform:translateY(var(--enter-rise))}}
 .bubble{transition:border-radius .28s var(--ease-soft),transform .2s var(--ease-soft),box-shadow .2s var(--ease-soft)}
 .attachment{transition:border-color .18s,background-color .18s,box-shadow .18s}
 .send{transition:background-color .16s,transform .16s var(--ease-soft)}
@@ -75,8 +80,10 @@
 
 @media(max-width:650px){:root{--r-bubble:18px;--r-bubble-lg:20px}}
 
-/* 5. Respect reduced-motion: no movement, no looping animation, instant state changes. */
+/* 5. Respect reduced-motion: no movement, no looping animation, instant state changes.
+      The entrance is switched off outright (not just shortened) so rows are never drawn in their hidden start state. */
 @media(prefers-reduced-motion:reduce){
+  .message,.typing{animation:none!important}
   *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important;transition-delay:0s!important;scroll-behavior:auto!important}
 }
 </style></head>
@@ -198,6 +205,8 @@
   });
 
   [].forEach.call(chat.querySelectorAll('.reaction'),function(b){if(isChip(b))b.setAttribute('aria-pressed',b.classList.contains('selected'))});
+  /* First-load stagger: each row gets its place in the sequence (capped, so a long history never feels slow). */
+  [].forEach.call(chat.querySelectorAll('.message,.typing'),function(row,i){row.style.setProperty('--i',Math.min(i,8))});
   window.refreshGroups=refreshGroups;
   window.reactionFx=reactionFx;
   refreshGroups();
